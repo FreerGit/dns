@@ -1,10 +1,29 @@
 let
- pkgs = import <nixpkgs> {};
- ocamlPackages = pkgs.ocaml-ng.ocamlPackages_latest;
+  nixpkgs-sources =
+    builtins.fetchTarball
+      https://github.com/nix-ocaml/nix-overlays/archive/master.tar.gz;
+  pkgs = import nixpkgs-sources { };
+  ocamlPackages = pkgs.ocaml-ng.ocamlPackages_latest;
+
 in
 pkgs.mkShell {
   # build tools
-  nativeBuildInputs = with pkgs; [ curl git dune-release inotify-tools ];
+  
+  nativeBuildInputs = with pkgs; [ curl git dune-release ocamlformat inotify-tools ];
   # dependencies
-  buildInputs = with ocamlPackages; [ ocaml findlib merlin ocamlformat utop core ];
+  buildInputs = 
+    with ocamlPackages;
+     [
+      ocaml
+      dune_3
+      ocaml-lsp
+
+      findlib
+      merlin
+      utop
+      core
+
+      eio
+      eio_main
+  ];
 }

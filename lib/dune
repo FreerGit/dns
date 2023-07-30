@@ -1,2 +1,4 @@
 (library
- (name dns))
+ (name dns)
+ (libraries core bin_prot)
+ (preprocess (pps ppx_jane ppx_expect)))

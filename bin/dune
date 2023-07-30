@@ -1,4 +1,4 @@
 (executable
  (public_name dns)
  (name main)
- (libraries dns))
+ (libraries dns dns_test))
