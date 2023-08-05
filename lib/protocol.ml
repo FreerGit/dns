@@ -60,6 +60,57 @@ module DnsHeader = struct
     }
 end
 
+module QueryType = struct 
+  [%%cenum
+  type t = 
+  | UNKNOWN of uint16_t
+  | A
+   [@@big_endian]]
+
+   type t =
+   | UNKNOWN of int
+   | A
+end
+
+module DnsQuestion = struct
+  type t = {
+    name: string
+    ; qtype: QueryType.t
+  } 
+
+
+end
+
+module DnsRecord = struct
+  [%%cenum
+    type t =
+    | UNKNOWN of {
+      domain: uint16_t
+    ; qtype: uint16_t
+      ; data_len: uint16_t
+      ; ttl: uint32_t
+      }
+    | A of {
+      domain: uint16_t
+      ; addr: uint16_t
+      ; ttl: uint32_t
+    }
+  [@@big_endian]]
+
+  type t = 
+  | UNKOWN of {
+    domain : string
+    ; qtype: int
+    ; data_len : int
+    ; ttl: int
+  }
+  | A of {
+    domain: string
+    ; addr: string
+    ; ttl: int
+  }
+end
+
 module DnsPacket = struct
   type t = { header : DnsHeader.t }
 end
