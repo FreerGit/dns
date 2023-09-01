@@ -8,6 +8,7 @@ module ResultCode = struct
     | NXDOMAIN
     | NOTIMP
     | REFUSED
+  [@@deriving show]
 
   let of_t num =
     match num with
@@ -24,74 +25,80 @@ module DnsHeader = struct
   [%%cstruct
   type t =
     { id : uint16_t
-    ; recursion_desired : uint8_t
-    ; truncated_message : uint8_t [@len 1]
-    (* 
-    ; authoritative_answer : char_t
-    ; opcode : uint8_t [@len 4]
-    ; response : char_t
-    ; rescode : uint8_t
-    ; checking_disabled : char_t
-    ; authed_data : char_t
-    ; z : char_t
-    ; recursion_available : char_t
+    ; flags : uint16_t
     ; questions : uint16_t
     ; answers : uint16_t
     ; authoritative_entries : uint16_t
-    ; resource_entries : uint16_t *)
+    ; resource_entries : uint16_t
     }
   [@@big_endian]]
 
   type t =
     { id : int
-    ; recursion_desired : string
-    (* 
-    ; response : char 
-    ; truncated_message : bool
-    ; authoritative_answer : bool
+    ; query_response : bool
     ; opcode : int
-    *)
-    (* ; rescode : ResultCode.t *)
-    (* ; checking_disabled : bool
-    ; authed_data : bool
-    ; z : bool
+    ; authoritative_answer : bool
+    ; truncated_message : bool
+    ; recursion_desired : bool
     ; recursion_available : bool
+    ; z : int
+    ; rescode : ResultCode.t
     ; questions : int
     ; answers : int
     ; authoritative_entries : int
-    ; resource_entries : int *)
-    } [@@deriving show]
+    ; resource_entries : int
+    }
+  [@@deriving show]
 
-    let read bytes = 
-      (* Eio.traceln "%S" bytes; *)
-      let idk = Cstruct.of_bytes bytes in
-
-      let result: t = {
-        id = get_t_id idk
-        ; recursion_desired = get_t_recursion_desired idk |> string_of_int 
+  let read bytes =
+    let ( & ) a b = a land b in
+    let get_id = get_t_id bytes in
+    let flags = get_t_flags bytes in
+    let qr = (flags lsr 15) & 1 in
+    let opcode = (flags lsr 11) & 0xF in
+    let aa = (flags lsr 10) & 1 in
+    let tc = (flags lsr 9) & 1 in
+    let rd = (flags lsr 8) & 1 in
+    let ra = (flags lsr 7) & 1 in
+    let z = (flags lsr 4) & 0x7 in
+    let rcode = flags & 0xF in
+    let result : t =
+      { id = get_id
+      ; query_response = Utils.bool_of_int qr
+      ; opcode
+      ; authoritative_answer = Utils.bool_of_int aa
+      ; truncated_message = Utils.bool_of_int tc
+      ; recursion_desired = Utils.bool_of_int rd
+      ; recursion_available = Utils.bool_of_int ra
+      ; z
+      ; rescode = ResultCode.of_t rcode
+      ; questions = get_t_questions bytes
+      ; answers = get_t_answers bytes
+      ; authoritative_entries = get_t_authoritative_entries bytes
+      ; resource_entries = get_t_resource_entries bytes
       }
-    in result
+    in
+    result
+  ;;
 end
 
-module QueryType = struct 
+module QueryType = struct
   (* [%%cenum
   type t = 
   (* | UNKNOWN of uint16_t *)
   | A
    [@@uint16_t]] *)
 
-   type t =
-   | UNKNOWN of int
-   | A
+  type t =
+    | UNKNOWN of int
+    | A
 end
 
 module DnsQuestion = struct
-  type t = {
-    name: string
-    ; qtype: QueryType.t
-  } 
-
-
+  type t =
+    { name : string
+    ; qtype : QueryType.t
+    }
 end
 
 module DnsRecord = struct
@@ -111,22 +118,20 @@ module DnsRecord = struct
     }
   [@@big_endian]] *)
 
-  type t = 
-  | UNKOWN of {
-    domain : string
-    ; qtype: int
-    ; data_len : int
-    ; ttl: int
-  }
-  | A of {
-    domain: string
-    ; addr: string
-    ; ttl: int
-  }
+  type t =
+    | UNKOWN of
+        { domain : string
+        ; qtype : int
+        ; data_len : int
+        ; ttl : int
+        }
+    | A of
+        { domain : string
+        ; addr : string
+        ; ttl : int
+        }
 end
 
 module DnsPacket = struct
-  type t = { 
-    header : DnsHeader.t 
-  }
+  type t = { header : DnsHeader.t }
 end
