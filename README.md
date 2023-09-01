@@ -163,3 +163,18 @@ Now it's easy to see the recusive nature of resolvers and how each node has it's
 
 So what we just did manually is essentially what a recursive resolver does, start at the root name server and recurse down until we get an answer.
 
+
+## Implementation
+The DNS protocol (not accounting for changes such as eDNS) is rather simple, it can be boiled down to this protocol:
+
+| Section            | Size     | Type              | Purpose                                                                                                |
+| ------------------ | -------- | ----------------- | ------------------------------------------------------------------------------------------------------ |
+| Header             | 12 Bytes | Header            | Information about the query/response.                                                                  |
+| Question Section   | Variable | List of Questions | In practice only a single question indicating the query name (domain) and the record type of interest. |
+| Answer Section     | Variable | List of Records   | The relevant records of the requested type.                                                            |
+| Authority Section  | Variable | List of Records   | An list of name servers (NS records), used for resolving queries recursively.                          |
+| Additional Section | Variable | List of Records   | Additional records, that might be useful. For instance, the corresponding A records for NS records.    |
+
+The request and response is the same which is neat.
+
+Each section has strict requirements, each field has a specific number of bits. Either see the [./lib/protocol.ml](/lib/protocol.ml) for the types or read https://datatracker.ietf.org/doc/html/rfc1034. 

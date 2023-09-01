@@ -27,5 +27,6 @@ pkgs.mkShell {
       eio_main
       cstruct
       ppx_cstruct
+      ppx_deriving
   ];
 }

@@ -1,6 +1,6 @@
 (library
  (name dns_test)
- (libraries core bin_prot eio eio_main)
+ (libraries dns core bin_prot eio eio_main)
  (preprocess
   (pps ppx_assert ppx_expect))
  (inline_tests))

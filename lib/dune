@@ -1,5 +1,5 @@
 (library
  (name dns)
- (libraries core cstruct)
+ (libraries core cstruct eio)
  (preprocess
-  (pps ppx_jane ppx_expect ppx_cstruct)))
+  (pps ppx_jane ppx_expect ppx_cstruct ppx_deriving.show)))
