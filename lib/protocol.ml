@@ -157,8 +157,9 @@ module DnsPacket = struct
 
   let read bytes =
     let header = DnsHeader.read bytes in
-    let without_header = Cstruct.sub bytes 12 12 in
-    Cstruct.to_string without_header |> Format.printf "%s@";
+    let without_header = Cstruct.shift bytes 12 in
+    Cstruct.hexdump without_header;
+    (* Cstruct.to_string without_header |> Format.printf "%s@"; *)
     { header; questions = [] }
   ;;
 end

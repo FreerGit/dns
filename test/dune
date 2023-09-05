@@ -1,7 +1,7 @@
 (library
  (name dns_test)
  (libraries dns core bin_prot eio eio_main)
- (inline_tests
-  (deps "./packets/response_packet.txt"))
  (preprocess
-  (pps ppx_expect)))
+  (pps ppx_inline_test ppx_expect))
+ (inline_tests
+  (deps "./packets/response_packet.txt")))

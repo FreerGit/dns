@@ -9,7 +9,7 @@ in
 pkgs.mkShell {
   # build tools
   
-  nativeBuildInputs = with pkgs; [ curl git dune-release ocamlformat inotify-tools ];
+  nativeBuildInputs = with pkgs; [ curl git dune-release ocamlformat inotify-tools patdiff ];
   # dependencies
   buildInputs = 
     with ocamlPackages;
@@ -28,5 +28,6 @@ pkgs.mkShell {
       cstruct
       ppx_cstruct
       ppx_deriving
+      ppx_expect
   ];
 }
