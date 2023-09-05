@@ -23,15 +23,15 @@ end
 
 module DnsHeader = struct
   [%%cstruct
-    type t =
-      { id : uint16_t
-      ; flags : uint16_t
-      ; questions : uint16_t
-      ; answers : uint16_t
-      ; authoritative_entries : uint16_t
-      ; resource_entries : uint16_t
-      }
-    [@@big_endian]]
+  type t =
+    { id : uint16_t
+    ; flags : uint16_t
+    ; questions : uint16_t
+    ; answers : uint16_t
+    ; authoritative_entries : uint16_t
+    ; resource_entries : uint16_t
+    }
+  [@@big_endian]]
 
   type t =
     { id : int
@@ -114,7 +114,7 @@ module DnsQuestion = struct
     }
   [@@deriving show]
 
-  let read bytes = Cstruct.hexdump bytes
+  let read _bytes = []
 end
 
 module DnsRecord = struct
@@ -158,8 +158,20 @@ module DnsPacket = struct
   let read bytes =
     let header = DnsHeader.read bytes in
     let without_header = Cstruct.shift bytes 12 in
+    (* TODO: iterate based on number off questions in header *)
+    let questions = DnsQuestion.read without_header in
     Cstruct.hexdump without_header;
+    (* let domain_length = Cstruct.get_uint8 without_header 0 in
+    (* If last two bits are set (=192) then the packet is compressed! *)
+    let is_compressed = phys_equal domain_length 192 in
+    let questions = ref [] in
+    if is_compressed
+    then questions := decode_compressed_name without_header
+    else (
+      print_endline @@ string_of_bool is_compressed;
+      print_endline @@ string_of_int domain_length;
+      questions := "dd"); *)
     (* Cstruct.to_string without_header |> Format.printf "%s@"; *)
-    { header; questions = [] }
+    { header; questions }
   ;;
 end
