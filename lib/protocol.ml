@@ -23,15 +23,15 @@ end
 
 module DnsHeader = struct
   [%%cstruct
-  type t =
-    { id : uint16_t
-    ; flags : uint16_t
-    ; questions : uint16_t
-    ; answers : uint16_t
-    ; authoritative_entries : uint16_t
-    ; resource_entries : uint16_t
-    }
-  [@@big_endian]]
+    type t =
+      { id : uint16_t
+      ; flags : uint16_t
+      ; questions : uint16_t
+      ; answers : uint16_t
+      ; authoritative_entries : uint16_t
+      ; resource_entries : uint16_t
+      }
+    [@@big_endian]]
 
   type t =
     { id : int
@@ -90,8 +90,21 @@ module QueryType = struct
    [@@uint16_t]] *)
 
   type t =
-    | UNKNOWN of int
     | A
+    | UNKOWN of int
+  [@@deriving show]
+
+  let num_of_t t =
+    match t with
+    | A -> 1
+    | UNKOWN x -> x
+  ;;
+
+  let t_of_num num =
+    match num with
+    | 1 -> A
+    | _ -> UNKOWN num
+  ;;
 end
 
 module DnsQuestion = struct
@@ -99,11 +112,14 @@ module DnsQuestion = struct
     { name : string
     ; qtype : QueryType.t
     }
+  [@@deriving show]
+
+  let read bytes = Cstruct.hexdump bytes
 end
 
 module DnsRecord = struct
-  (* 
-  [%%cenum
+  (*
+     [%%cenum
     type t =
     |  {
       domain: uint16_t
@@ -133,5 +149,16 @@ module DnsRecord = struct
 end
 
 module DnsPacket = struct
-  type t = { header : DnsHeader.t }
+  type t =
+    { header : DnsHeader.t
+    ; questions : DnsQuestion.t list
+    }
+  [@@deriving show]
+
+  let read bytes =
+    let header = DnsHeader.read bytes in
+    let without_header = Cstruct.sub bytes 12 12 in
+    Cstruct.to_string without_header |> Format.printf "%s@";
+    { header; questions = [] }
+  ;;
 end
