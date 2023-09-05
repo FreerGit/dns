@@ -1,4 +1,5 @@
 open Core
+open Packet_buffer
 
 module ResultCode = struct
   type t =
@@ -113,6 +114,41 @@ module DnsQuestion = struct
     ; qtype : QueryType.t
     }
   [@@deriving show]
+
+  let read_qname (p_buffer : PacketBuffer.t) =
+    let domain_name = ref "" in
+    let local_pos = ref p_buffer.pos in
+    let jumped = ref false in
+    let max_jumps = 5 in
+    let jumps_performed = ref 0 in
+    let delim = ref "" in
+    let rec loop () =
+      match !jumps_performed > max_jumps with
+      | true -> raise_s [%message "Error: Limit of jumps exceeded" ~loc:[%here]]
+      | false ->
+        let len = PacketBuffer.get p_buffer !local_pos in
+        (* If len has the two most sign. bits set then we need to jump *)
+        (match phys_equal (len land 0xC0) 0xC0 with
+         | true ->
+           if not !jumped then PacketBuffer.seek p_buffer (!local_pos + 2);
+           let next_byte = PacketBuffer.get p_buffer (!local_pos + 1) in
+           let offset = len lxor ((0xC0 lsl 8) lor next_byte) in
+           local_pos := offset;
+           jumped := true;
+           jumps_performed := !jumps_performed + 1;
+           loop ()
+         | false ->
+           local_pos := !local_pos + 1;
+           if not @@ phys_equal len 0 then domain_name := !delim;
+           let str_buffer = PacketBuffer.get_range p_buffer ~pos:!local_pos ~len in
+           domain_name := !domain_name ^ (Bytes.to_string str_buffer |> String.lowercase);
+           delim := ".";
+           local_pos := !local_pos + len)
+    in
+    loop ();
+    if not !jumped then PacketBuffer.seek p_buffer !local_pos;
+    domain_name
+  ;;
 
   let read _bytes = []
 end
