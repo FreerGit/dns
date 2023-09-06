@@ -9,7 +9,7 @@ module ResultCode = struct
     | NXDOMAIN
     | NOTIMP
     | REFUSED
-  [@@deriving show]
+  [@@deriving show { with_path = false }]
 
   let of_t num =
     match num with
@@ -49,7 +49,7 @@ module DnsHeader = struct
     ; authoritative_entries : int
     ; resource_entries : int
     }
-  [@@deriving show]
+  [@@deriving show { with_path = false }]
 
   let read bytes =
     let ( & ) a b = a land b in
@@ -93,7 +93,7 @@ module QueryType = struct
   type t =
     | A
     | UNKOWN of int
-  [@@deriving show]
+  [@@deriving show { with_path = false }]
 
   let num_of_t t =
     match t with
@@ -113,7 +113,7 @@ module DnsQuestion = struct
     { name : string
     ; qtype : QueryType.t
     }
-  [@@deriving show]
+  [@@deriving show { with_path = false }]
 
   let read_qname (p_buffer : PacketBuffer.t) =
     let domain_name = ref "" in
@@ -139,18 +139,26 @@ module DnsQuestion = struct
            loop ()
          | false ->
            local_pos := !local_pos + 1;
-           if not @@ phys_equal len 0 then domain_name := !delim;
-           let str_buffer = PacketBuffer.get_range p_buffer ~pos:!local_pos ~len in
-           domain_name := !domain_name ^ (Bytes.to_string str_buffer |> String.lowercase);
-           delim := ".";
-           local_pos := !local_pos + len)
+           if not @@ phys_equal len 0
+           then (
+             domain_name := !domain_name ^ !delim;
+             let str_buffer = PacketBuffer.get_range p_buffer ~pos:!local_pos ~len in
+             domain_name := !domain_name ^ (Bytes.to_string str_buffer |> String.lowercase);
+             delim := ".";
+             local_pos := !local_pos + len;
+             loop ()))
     in
     loop ();
     if not !jumped then PacketBuffer.seek p_buffer !local_pos;
-    domain_name
+    !domain_name
   ;;
 
-  let read _bytes = []
+  let read bytes =
+    let buffer = PacketBuffer.create bytes in
+    let name = read_qname buffer in
+    let qtype = PacketBuffer.read_u16 buffer |> QueryType.t_of_num in
+    { name; qtype }
+  ;;
 end
 
 module DnsRecord = struct
@@ -189,25 +197,17 @@ module DnsPacket = struct
     { header : DnsHeader.t
     ; questions : DnsQuestion.t list
     }
-  [@@deriving show]
+  [@@deriving show { with_path = false }]
 
   let read bytes =
     let header = DnsHeader.read bytes in
     let without_header = Cstruct.shift bytes 12 in
-    (* TODO: iterate based on number off questions in header *)
-    let questions = DnsQuestion.read without_header in
-    Cstruct.hexdump without_header;
-    (* let domain_length = Cstruct.get_uint8 without_header 0 in
-    (* If last two bits are set (=192) then the packet is compressed! *)
-    let is_compressed = phys_equal domain_length 192 in
     let questions = ref [] in
-    if is_compressed
-    then questions := decode_compressed_name without_header
-    else (
-      print_endline @@ string_of_bool is_compressed;
-      print_endline @@ string_of_int domain_length;
-      questions := "dd"); *)
-    (* Cstruct.to_string without_header |> Format.printf "%s@"; *)
-    { header; questions }
+    (* TODO: iterate based on number off questions in header *)
+    for _ = 1 to header.questions do
+      let question = DnsQuestion.read (Cstruct.to_bytes without_header) in
+      questions := List.cons question !questions
+    done;
+    { header; questions = !questions }
   ;;
 end

@@ -6,7 +6,12 @@ module PacketBuffer = struct
     ; mutable pos : int
     }
 
-  let create () = { buf = Bigbuffer.create 512; pos = 0 }
+  let create bytes =
+    let self = { buf = Bigbuffer.create 512; pos = 0 } in
+    Bigbuffer.add_bytes self.buf bytes;
+    self
+  ;;
+
   let step t steps = t.pos <- t.pos + steps
   let seek t pos = t.pos <- pos
 
@@ -22,7 +27,7 @@ module PacketBuffer = struct
   let get t pos =
     if pos >= 512
     then raise_s [%message "Error: End of buffer" ~loc:[%here]]
-    else Bigbuffer.nth t.buf t.pos |> Char.to_int
+    else Bigbuffer.nth t.buf pos |> Char.to_int
   ;;
 
   let get_range t ~pos ~len =

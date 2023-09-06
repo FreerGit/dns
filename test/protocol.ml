@@ -12,11 +12,11 @@ let%expect_test "DNS Header" =
   |> print_endline;
   [%expect
     {|
-    { Protocol.DnsHeader.id = 34346; query_response = true; opcode = 0;
+    { id = 34346; query_response = true; opcode = 0;
       authoritative_answer = false; truncated_message = false;
       recursion_desired = true; recursion_available = true; z = 0;
-      rescode = Protocol.ResultCode.NOERROR; questions = 1; answers = 1;
-      authoritative_entries = 0; resource_entries = 0 }|}]
+      rescode = NOERROR; questions = 1; answers = 1; authoritative_entries = 0;
+      resource_entries = 0 }|}]
 ;;
 
 let%expect_test "DNS Packet" =
@@ -31,11 +31,11 @@ let%expect_test "DNS Packet" =
   |> print_endline;
   [%expect
     {|
-    { Protocol.DnsPacket.header =
-      { Protocol.DnsHeader.id = 34346; query_response = true; opcode = 0;
+    { header =
+      { id = 34346; query_response = true; opcode = 0;
         authoritative_answer = false; truncated_message = false;
         recursion_desired = true; recursion_available = true; z = 0;
-        rescode = Protocol.ResultCode.NOERROR; questions = 1; answers = 1;
-        authoritative_entries = 0; resource_entries = 0 };
-      questions = [] }|}]
+        rescode = NOERROR; questions = 1; answers = 1; authoritative_entries = 0;
+        resource_entries = 0 };
+      questions = [{ name = "google.com"; qtype = A }] }|}]
 ;;
