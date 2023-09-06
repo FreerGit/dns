@@ -5,6 +5,7 @@ module PacketBuffer = struct
     { mutable buf : Bigbuffer.t
     ; mutable pos : int
     }
+  [@@deriving sexp_of]
 
   let create bytes =
     let self = { buf = Bigbuffer.create 512; pos = 0 } in
@@ -14,6 +15,7 @@ module PacketBuffer = struct
 
   let step t steps = t.pos <- t.pos + steps
   let seek t pos = t.pos <- pos
+  let reset_pos t = t.pos <- 0
 
   let read t =
     if t.pos >= 512
@@ -37,15 +39,18 @@ module PacketBuffer = struct
   ;;
 
   let read_u16 t =
-    let first_byte = read t lsl 8 in
-    let second_byte = read t in
-    first_byte lor second_byte
+    let a = read t lsl 8 in
+    let b = read t in
+    let x = a lor b in
+    x
   ;;
 
   let read_u32 t =
-    let first_byte = read t lsl 24 in
-    let second_byte = read t lsl 16 in
-    let remaining_u16 = read_u16 t in
-    first_byte lor second_byte lor remaining_u16
+    let a = read t lsl 24 in
+    let b = read t lsl 16 in
+    let c = read t lsl 8 in
+    let d = read t lsl 0 in
+    a lor b lor c lor d
   ;;
+  (* a lor b |> ( lor ) (read t lsl 8) |> ( lor ) (read t lsl 0) *)
 end

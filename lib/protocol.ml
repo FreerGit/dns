@@ -36,14 +36,16 @@ module DnsHeader = struct
 
   type t =
     { id : int
-    ; query_response : bool
-    ; opcode : int
-    ; authoritative_answer : bool
-    ; truncated_message : bool
     ; recursion_desired : bool
-    ; recursion_available : bool
-    ; z : int
+    ; truncated_message : bool
+    ; authoritative_answer : bool
+    ; opcode : int
+    ; query_response : bool
     ; rescode : ResultCode.t
+    ; checking_disabled : bool
+    ; authed_data : bool
+    ; z : bool
+    ; recursion_available : bool
     ; questions : int
     ; answers : int
     ; authoritative_entries : int
@@ -51,32 +53,31 @@ module DnsHeader = struct
     }
   [@@deriving show { with_path = false }]
 
-  let read bytes =
-    let ( & ) a b = a land b in
-    let get_id = get_t_id bytes in
-    let flags = get_t_flags bytes in
-    let qr = (flags lsr 15) & 1 in
-    let opcode = (flags lsr 11) & 0xF in
-    let aa = (flags lsr 10) & 1 in
-    let tc = (flags lsr 9) & 1 in
-    let rd = (flags lsr 8) & 1 in
-    let ra = (flags lsr 7) & 1 in
-    let z = (flags lsr 4) & 0x7 in
-    let rcode = flags & 0xF in
+  let read buffer =
+    let id = PacketBuffer.read_u16 buffer in
+    let flags = PacketBuffer.read_u16 buffer in
+    let a = flags lsr 8 in
+    let b = flags land 0xFF in
+    let questions = PacketBuffer.read_u16 buffer in
+    let answers = PacketBuffer.read_u16 buffer in
+    let authoritative_entries = PacketBuffer.read_u16 buffer in
+    let resource_entries = PacketBuffer.read_u16 buffer in
     let result : t =
-      { id = get_id
-      ; query_response = Utils.bool_of_int qr
-      ; opcode
-      ; authoritative_answer = Utils.bool_of_int aa
-      ; truncated_message = Utils.bool_of_int tc
-      ; recursion_desired = Utils.bool_of_int rd
-      ; recursion_available = Utils.bool_of_int ra
-      ; z
-      ; rescode = ResultCode.of_t rcode
-      ; questions = get_t_questions bytes
-      ; answers = get_t_answers bytes
-      ; authoritative_entries = get_t_authoritative_entries bytes
-      ; resource_entries = get_t_resource_entries bytes
+      { id
+      ; recursion_desired = a land (1 lsl 0) > 0
+      ; truncated_message = a land (1 lsl 1) > 0
+      ; authoritative_answer = a land (1 lsl 2) > 0
+      ; opcode = (a lsr 3) land 0x0F
+      ; query_response = a land (1 lsl 7) > 0
+      ; rescode = ResultCode.of_t (b land 0x0F)
+      ; checking_disabled = b land (1 lsl 4) > 0
+      ; authed_data = b land (1 lsl 5) > 0
+      ; z = b land (1 lsl 6) > 0
+      ; recursion_available = b land (1 lsl 7) > 0
+      ; questions
+      ; answers
+      ; authoritative_entries
+      ; resource_entries
       }
     in
     result
@@ -84,12 +85,6 @@ module DnsHeader = struct
 end
 
 module QueryType = struct
-  (* [%%cenum
-  type t = 
-  (* | UNKNOWN of uint16_t *)
-  | A
-   [@@uint16_t]] *)
-
   type t =
     | A
     | UNKOWN of int
@@ -132,7 +127,7 @@ module DnsQuestion = struct
          | true ->
            if not !jumped then PacketBuffer.seek p_buffer (!local_pos + 2);
            let next_byte = PacketBuffer.get p_buffer (!local_pos + 1) in
-           let offset = len lxor ((0xC0 lsl 8) lor next_byte) in
+           let offset = ((len lxor 0xC0) lsl 8) lor next_byte in
            local_pos := offset;
            jumped := true;
            jumps_performed := !jumps_performed + 1;
@@ -153,31 +148,15 @@ module DnsQuestion = struct
     !domain_name
   ;;
 
-  let read bytes =
-    let buffer = PacketBuffer.create bytes in
+  let read buffer =
     let name = read_qname buffer in
     let qtype = PacketBuffer.read_u16 buffer |> QueryType.t_of_num in
+    let _ = PacketBuffer.read_u16 buffer in
     { name; qtype }
   ;;
 end
 
 module DnsRecord = struct
-  (*
-     [%%cenum
-    type t =
-    |  {
-      domain: uint16_t
-    ; qtype: uint16_t
-      ; data_len: uint16_t
-      ; ttl: uint32_t
-      }
-    | A of {
-      domain: uint16_t
-      ; addr: uint16_t
-      ; ttl: uint32_t
-    }
-  [@@big_endian]] *)
-
   type t =
     | UNKOWN of
         { domain : string
@@ -187,27 +166,62 @@ module DnsRecord = struct
         }
     | A of
         { domain : string
-        ; addr : string
+        ; addr : Ipaddr.V4.t
         ; ttl : int
         }
+  [@@deriving show { with_path = false }]
+
+  let read buffer =
+    let domain = DnsQuestion.read_qname buffer in
+    let qtype_num = PacketBuffer.read_u16 buffer in
+    let qtype = QueryType.t_of_num qtype_num in
+    (* Ignore QCLASS for now *)
+    let _ = PacketBuffer.read_u16 buffer in
+    let ttl = PacketBuffer.read_u32 buffer in
+    let data_len = PacketBuffer.read_u16 buffer in
+    match qtype with
+    | A ->
+      let raw_addr = PacketBuffer.read_u32 buffer in
+      let addr =
+        Ipaddr.V4.make
+          (raw_addr lsr 24 |> ( land ) 0xFF)
+          (raw_addr lsr 16 |> ( land ) 0xFF)
+          (raw_addr lsr 8 |> ( land ) 0xFF)
+          (raw_addr lsr 0 |> ( land ) 0xFF)
+      in
+      A { domain; addr; ttl }
+    | UNKOWN _ ->
+      PacketBuffer.step buffer data_len;
+      UNKOWN { domain; qtype = qtype_num; data_len; ttl }
+  ;;
 end
 
 module DnsPacket = struct
   type t =
     { header : DnsHeader.t
     ; questions : DnsQuestion.t list
+    ; answers : DnsRecord.t list
     }
   [@@deriving show { with_path = false }]
 
-  let read bytes =
-    let header = DnsHeader.read bytes in
-    let without_header = Cstruct.shift bytes 12 in
+  let read buffer =
+    (* let buffer = PacketBuffer.create (Cstruct.to_bytes bytes) in *)
+    let header = DnsHeader.read buffer in
+    (* let without_header = Cstruct.shift bytes 12 in *)
+    (* Cstruct.hexdump without_header; *)
     let questions = ref [] in
+    let answers = ref [] in
     (* TODO: iterate based on number off questions in header *)
     for _ = 1 to header.questions do
-      let question = DnsQuestion.read (Cstruct.to_bytes without_header) in
+      let question = DnsQuestion.read buffer in
       questions := List.cons question !questions
+      (* PacketBuffer.reset_pos buffer *)
     done;
-    { header; questions = !questions }
+    for _ = 1 to header.answers do
+      let answer = DnsRecord.read buffer in
+      answers := List.cons answer !answers
+      (* PacketBuffer.reset_pos buffer *)
+    done;
+    { header; questions = !questions; answers = !answers }
   ;;
 end

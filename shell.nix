@@ -26,8 +26,10 @@ pkgs.mkShell {
       eio
       eio_main
       cstruct
+      ipaddr
       ppx_cstruct
       ppx_deriving
       ppx_expect
+
   ];
 }
