@@ -135,7 +135,8 @@ module DnsHeader = struct
     PacketBuffer.write_u16 buffer t.questions;
     PacketBuffer.write_u16 buffer t.answers;
     PacketBuffer.write_u16 buffer t.authoritative_entries;
-    PacketBuffer.write_u16 buffer t.resource_entries
+    PacketBuffer.write_u16 buffer t.resource_entries;
+    Cstruct.hexdump buffer.buf
   ;;
 end
 
@@ -304,10 +305,7 @@ module DnsPacket = struct
   ;;
 
   let read buffer =
-    (* let buffer = PacketBuffer.create (Cstruct.to_bytes bytes) in *)
     let header = DnsHeader.read buffer in
-    (* let without_header = Cstruct.shift bytes 12 in *)
-    (* Cstruct.hexdump without_header; *)
     let questions = ref [] in
     let answers = ref [] in
     let authorities = ref [] in
@@ -338,9 +336,7 @@ module DnsPacket = struct
   ;;
 
   let write buffer t =
-    print_endline @@ Int.to_string t.header.id;
     DnsHeader.write buffer t.header;
-    Eio.traceln "%s" (Cstruct.to_string buffer.buf);
     List.iter t.questions ~f:(DnsQuestion.write buffer);
     List.iter t.answers ~f:(fun req -> DnsRecord.write buffer req |> ignore);
     List.iter t.authorities ~f:(fun req -> DnsRecord.write buffer req |> ignore);
