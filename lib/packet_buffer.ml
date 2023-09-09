@@ -2,26 +2,24 @@ open Core
 
 module PacketBuffer = struct
   type t =
-    { mutable buf : Bigbuffer.t
+    { mutable buf : Cstruct.t
     ; mutable pos : int
     }
-  [@@deriving sexp_of]
 
   let create bytes =
-    let self = { buf = Bigbuffer.create 512; pos = 0 } in
-    Bigbuffer.add_bytes self.buf bytes;
+    let self = { buf = Cstruct.create 512; pos = 0 } in
+    self.buf <- Cstruct.of_string bytes;
     self
   ;;
 
   let step t steps = t.pos <- t.pos + steps
   let seek t pos = t.pos <- pos
-  let reset_pos t = t.pos <- 0
 
   let read t =
     if t.pos >= 512
     then raise_s [%message "Error: End of buffer" ~loc:[%here]]
     else (
-      let res = Bigbuffer.nth t.buf t.pos in
+      let res = Cstruct.get t.buf t.pos in
       t.pos <- t.pos + 1;
       Char.to_int res)
   ;;
@@ -29,13 +27,13 @@ module PacketBuffer = struct
   let get t pos =
     if pos >= 512
     then raise_s [%message "Error: End of buffer" ~loc:[%here]]
-    else Bigbuffer.nth t.buf pos |> Char.to_int
+    else Cstruct.get t.buf pos |> Char.to_int
   ;;
 
   let get_range t ~pos ~len =
     if pos + len >= 512
     then raise_s [%message "Error: End of buffer" ~loc:[%here]]
-    else Bigbuffer.sub t.buf ~pos ~len
+    else Cstruct.sub t.buf pos len
   ;;
 
   let read_u16 t =
@@ -52,5 +50,23 @@ module PacketBuffer = struct
     let d = read t lsl 0 in
     a lor b lor c lor d
   ;;
-  (* a lor b |> ( lor ) (read t lsl 8) |> ( lor ) (read t lsl 0) *)
+
+  let write t u8 =
+    if t.pos >= 512
+    then raise_s [%message "Error: End of buffer" ~loc:[%here]]
+    else Cstruct.set_uint8 t.buf t.pos u8;
+    t.pos <- t.pos + 1
+  ;;
+
+  let write_u16 t u16 =
+    write t (u16 lsr 8);
+    write t (u16 land 0xFF)
+  ;;
+
+  let write_u32 t u32 =
+    write t ((u32 lsr 24) land 0xFF);
+    write t ((u32 lsr 16) land 0xFF);
+    write t ((u32 lsr 8) land 0xFF);
+    write t ((u32 lsr 0) land 0xFF)
+  ;;
 end

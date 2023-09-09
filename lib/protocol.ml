@@ -20,6 +20,16 @@ module ResultCode = struct
     | 5 -> REFUSED
     | 0 | _ -> NOERROR
   ;;
+
+  let to_int code =
+    match code with
+    | NOERROR -> 0
+    | FORMERR -> 1
+    | SERVFAIL -> 2
+    | NXDOMAIN -> 3
+    | NOTIMP -> 4
+    | REFUSED -> 5
+  ;;
 end
 
 module DnsHeader = struct
@@ -53,6 +63,28 @@ module DnsHeader = struct
     }
   [@@deriving show { with_path = false }]
 
+  let make () =
+    let header : t =
+      { id = 0
+      ; recursion_desired = false
+      ; truncated_message = false
+      ; authoritative_answer = false
+      ; opcode = 0
+      ; query_response = false
+      ; rescode = ResultCode.NOERROR
+      ; checking_disabled = false
+      ; authed_data = false
+      ; z = false
+      ; recursion_available = false
+      ; questions = 0
+      ; answers = 0
+      ; authoritative_entries = 0
+      ; resource_entries = 0
+      }
+    in
+    header
+  ;;
+
   let read buffer =
     let id = PacketBuffer.read_u16 buffer in
     let flags = PacketBuffer.read_u16 buffer in
@@ -81,6 +113,29 @@ module DnsHeader = struct
       }
     in
     result
+  ;;
+
+  let write buffer t =
+    PacketBuffer.write_u16 buffer t.id;
+    let to_int = Bool.to_int in
+    PacketBuffer.write
+      buffer
+      (to_int t.recursion_desired
+       lor (to_int t.truncated_message lsl 1)
+       lor (to_int t.authoritative_answer lsl 2)
+       lor (t.opcode lsl 3)
+       lor (to_int t.query_response lsl 7));
+    PacketBuffer.write
+      buffer
+      (ResultCode.to_int t.rescode
+       lor (to_int t.checking_disabled lsl 4)
+       lor (to_int t.authed_data lsl 5)
+       lor (to_int t.z lsl 6)
+       lor (to_int t.recursion_available lsl 7));
+    PacketBuffer.write_u16 buffer t.questions;
+    PacketBuffer.write_u16 buffer t.answers;
+    PacketBuffer.write_u16 buffer t.authoritative_entries;
+    PacketBuffer.write_u16 buffer t.resource_entries
   ;;
 end
 
@@ -138,7 +193,8 @@ module DnsQuestion = struct
            then (
              domain_name := !domain_name ^ !delim;
              let str_buffer = PacketBuffer.get_range p_buffer ~pos:!local_pos ~len in
-             domain_name := !domain_name ^ (Bytes.to_string str_buffer |> String.lowercase);
+             domain_name
+               := !domain_name ^ (Cstruct.to_string str_buffer |> String.lowercase);
              delim := ".";
              local_pos := !local_pos + len;
              loop ()))
@@ -148,11 +204,28 @@ module DnsQuestion = struct
     !domain_name
   ;;
 
+  let write_qname (p_buffer : PacketBuffer.t) qname =
+    List.iter (String.split qname ~on:'.') ~f:(fun label ->
+      let len = String.length label in
+      if len > 0x3f
+      then raise_s [%message "Error: Single label exceeds 63 chars length" ~loc:[%here]]
+      else PacketBuffer.write p_buffer len;
+      String.iter label ~f:(fun b -> PacketBuffer.write p_buffer (Char.to_int b));
+      PacketBuffer.write p_buffer 0)
+  ;;
+
   let read buffer =
     let name = read_qname buffer in
     let qtype = PacketBuffer.read_u16 buffer |> QueryType.t_of_num in
     let _ = PacketBuffer.read_u16 buffer in
     { name; qtype }
+  ;;
+
+  let write buffer t =
+    write_qname buffer t.name;
+    let typenum = QueryType.num_of_t t.qtype in
+    PacketBuffer.write_u16 buffer typenum;
+    PacketBuffer.write_u16 buffer 1
   ;;
 end
 
@@ -194,6 +267,26 @@ module DnsRecord = struct
       PacketBuffer.step buffer data_len;
       UNKOWN { domain; qtype = qtype_num; data_len; ttl }
   ;;
+
+  let write (buffer : PacketBuffer.t) t =
+    let start_pos = buffer.pos in
+    let _ =
+      match t with
+      | UNKOWN u -> Format.printf "Skipping record %s" u.domain
+      | A a ->
+        DnsQuestion.write_qname buffer a.domain;
+        PacketBuffer.write_u16 buffer (QueryType.num_of_t QueryType.A);
+        PacketBuffer.write_u16 buffer 1;
+        PacketBuffer.write_u16 buffer a.ttl;
+        PacketBuffer.write_u16 buffer 4;
+        let octets = Ipaddr.V4.to_octets a.addr in
+        PacketBuffer.write buffer (String.get octets 0 |> Char.to_int);
+        PacketBuffer.write buffer (String.get octets 1 |> Char.to_int);
+        PacketBuffer.write buffer (String.get octets 2 |> Char.to_int);
+        PacketBuffer.write buffer (String.get octets 3 |> Char.to_int)
+    in
+    buffer.pos - start_pos
+  ;;
 end
 
 module DnsPacket = struct
@@ -205,6 +298,10 @@ module DnsPacket = struct
     ; resources : DnsRecord.t list
     }
   [@@deriving show { with_path = false }]
+
+  let make header =
+    { header; questions = []; answers = []; authorities = []; resources = [] }
+  ;;
 
   let read buffer =
     (* let buffer = PacketBuffer.create (Cstruct.to_bytes bytes) in *)
@@ -238,5 +335,16 @@ module DnsPacket = struct
     ; authorities = !authorities
     ; resources = !resources
     }
+  ;;
+
+  let write buffer t =
+    print_endline @@ Int.to_string t.header.id;
+    DnsHeader.write buffer t.header;
+    Eio.traceln "%s" (Cstruct.to_string buffer.buf);
+    List.iter t.questions ~f:(DnsQuestion.write buffer);
+    List.iter t.answers ~f:(fun req -> DnsRecord.write buffer req |> ignore);
+    List.iter t.authorities ~f:(fun req -> DnsRecord.write buffer req |> ignore);
+    List.iter t.resources ~f:(fun req -> DnsRecord.write buffer req |> ignore);
+    ()
   ;;
 end
