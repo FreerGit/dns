@@ -201,6 +201,8 @@ module DnsPacket = struct
     { header : DnsHeader.t
     ; questions : DnsQuestion.t list
     ; answers : DnsRecord.t list
+    ; authorities : DnsRecord.t list
+    ; resources : DnsRecord.t list
     }
   [@@deriving show { with_path = false }]
 
@@ -211,17 +213,30 @@ module DnsPacket = struct
     (* Cstruct.hexdump without_header; *)
     let questions = ref [] in
     let answers = ref [] in
+    let authorities = ref [] in
+    let resources = ref [] in
     (* TODO: iterate based on number off questions in header *)
     for _ = 1 to header.questions do
       let question = DnsQuestion.read buffer in
       questions := List.cons question !questions
-      (* PacketBuffer.reset_pos buffer *)
     done;
     for _ = 1 to header.answers do
       let answer = DnsRecord.read buffer in
       answers := List.cons answer !answers
-      (* PacketBuffer.reset_pos buffer *)
     done;
-    { header; questions = !questions; answers = !answers }
+    for _ = 1 to header.authoritative_entries do
+      let authority = DnsRecord.read buffer in
+      authorities := List.cons authority !authorities
+    done;
+    for _ = 1 to header.resource_entries do
+      let resource = DnsRecord.read buffer in
+      resources := List.cons resource !resources
+    done;
+    { header
+    ; questions = !questions
+    ; answers = !answers
+    ; authorities = !authorities
+    ; resources = !resources
+    }
   ;;
 end

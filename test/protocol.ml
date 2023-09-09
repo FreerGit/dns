@@ -42,5 +42,6 @@ let%expect_test "DNS Packet" =
         z = false; recursion_available = true; questions = 1; answers = 1;
         authoritative_entries = 0; resource_entries = 0 };
       questions = [{ name = "google.com"; qtype = A }];
-      answers = [A {domain = "google.com"; addr = 216.58.211.142; ttl = 293}] }|}]
+      answers = [A {domain = "google.com"; addr = 216.58.211.142; ttl = 293}];
+      authorities = []; resources = [] }|}]
 ;;
