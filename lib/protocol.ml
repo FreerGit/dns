@@ -141,19 +141,31 @@ end
 
 module QueryType = struct
   type t =
-    | A
     | UNKOWN of int
+    | A
+    | NS
+    | CNAME
+    | MX
+    | AAAA
   [@@deriving show { with_path = false }]
 
   let num_of_t t =
     match t with
-    | A -> 1
     | UNKOWN x -> x
+    | A -> 1
+    | NS -> 2
+    | CNAME -> 5
+    | MX -> 15
+    | AAAA -> 28
   ;;
 
   let t_of_num num =
     match num with
     | 1 -> A
+    | 2 -> NS
+    | 5 -> CNAME
+    | 15 -> MX
+    | 28 -> AAAA
     | _ -> UNKOWN num
   ;;
 end
@@ -242,6 +254,27 @@ module DnsRecord = struct
         ; addr : Ipaddr.V4.t
         ; ttl : int
         }
+    | NS of
+        { domain : string
+        ; host : string
+        ; ttl : int
+        }
+    | CNAME of
+        { domain : string
+        ; host : string
+        ; ttl : int
+        }
+    | MX of
+        { domain : string
+        ; priority : int
+        ; host : string
+        ; ttl : int
+        }
+    | AAAA of
+        { domain : string
+        ; addr : Ipaddr.V6.t
+        ; ttl : int
+        }
   [@@deriving show { with_path = false }]
 
   let read buffer =
@@ -263,6 +296,33 @@ module DnsRecord = struct
           (raw_addr lsr 0 |> ( land ) 0xFF)
       in
       A { domain; addr; ttl }
+    | AAAA ->
+      let raw_addr1 = PacketBuffer.read_u32 buffer in
+      let raw_addr2 = PacketBuffer.read_u32 buffer in
+      let raw_addr3 = PacketBuffer.read_u32 buffer in
+      let raw_addr4 = PacketBuffer.read_u32 buffer in
+      let addr =
+        Ipaddr.V6.make
+          ((raw_addr1 lsr 16) land 0xFFFF)
+          ((raw_addr1 lsr 0) land 0xFFFF)
+          ((raw_addr2 lsr 16) land 0xFFFF)
+          ((raw_addr2 lsr 0) land 0xFFFF)
+          ((raw_addr3 lsr 16) land 0xFFFF)
+          ((raw_addr3 lsr 0) land 0xFFFF)
+          ((raw_addr4 lsr 16) land 0xFFFF)
+          ((raw_addr4 lsr 0) land 0xFFFF)
+      in
+      AAAA { domain; addr; ttl }
+    | NS ->
+      let name = DnsQuestion.read_qname buffer in
+      NS { domain; host = name; ttl }
+    | CNAME ->
+      let name = DnsQuestion.read_qname buffer in
+      CNAME { domain; host = name; ttl }
+    | MX ->
+      let priority = PacketBuffer.read_u16 buffer in
+      let name = DnsQuestion.read_qname buffer in
+      MX { domain; priority; host = name; ttl }
     | UNKOWN _ ->
       PacketBuffer.step buffer data_len;
       UNKOWN { domain; qtype = qtype_num; data_len; ttl }
@@ -270,20 +330,59 @@ module DnsRecord = struct
 
   let write (buffer : PacketBuffer.t) t =
     let start_pos = buffer.pos in
+    let open PacketBuffer in
     let _ =
       match t with
-      | UNKOWN u -> Format.printf "Skipping record %s" u.domain
       | A a ->
         DnsQuestion.write_qname buffer a.domain;
-        PacketBuffer.write_u16 buffer (QueryType.num_of_t QueryType.A);
-        PacketBuffer.write_u16 buffer 1;
-        PacketBuffer.write_u16 buffer a.ttl;
-        PacketBuffer.write_u16 buffer 4;
+        write_u16 buffer (QueryType.num_of_t QueryType.A);
+        write_u16 buffer 1;
+        write_u16 buffer a.ttl;
+        write_u16 buffer 4;
         let octets = Ipaddr.V4.to_octets a.addr in
-        PacketBuffer.write buffer (String.get octets 0 |> Char.to_int);
-        PacketBuffer.write buffer (String.get octets 1 |> Char.to_int);
-        PacketBuffer.write buffer (String.get octets 2 |> Char.to_int);
-        PacketBuffer.write buffer (String.get octets 3 |> Char.to_int)
+        write buffer (String.get octets 0 |> Char.to_int);
+        write buffer (String.get octets 1 |> Char.to_int);
+        write buffer (String.get octets 2 |> Char.to_int);
+        write buffer (String.get octets 3 |> Char.to_int)
+      | NS ns ->
+        DnsQuestion.write_qname buffer ns.domain;
+        write_u16 buffer (QueryType.NS |> QueryType.num_of_t);
+        write_u16 buffer 1;
+        write_u16 buffer ns.ttl;
+        let pos = buffer.pos in
+        write_u16 buffer 0;
+        DnsQuestion.write_qname buffer ns.host;
+        let size = buffer.pos - (pos + 2) in
+        set_u16 buffer ~pos ~u16:size
+      | CNAME cn ->
+        DnsQuestion.write_qname buffer cn.domain;
+        write_u16 buffer (QueryType.NS |> QueryType.num_of_t);
+        write_u16 buffer 1;
+        write_u16 buffer cn.ttl;
+        let pos = buffer.pos in
+        write_u16 buffer 0;
+        DnsQuestion.write_qname buffer cn.host;
+        let size = buffer.pos - (pos + 2) in
+        set_u16 buffer ~pos ~u16:size
+      | MX mx ->
+        DnsQuestion.write_qname buffer mx.domain;
+        write_u16 buffer (QueryType.NS |> QueryType.num_of_t);
+        write_u16 buffer 1;
+        write_u16 buffer mx.ttl;
+        let pos = buffer.pos in
+        write_u16 buffer 0;
+        write_u16 buffer mx.priority;
+        DnsQuestion.write_qname buffer mx.host;
+        let size = buffer.pos - (pos + 2) in
+        set_u16 buffer ~pos ~u16:size
+      | AAAA quad_a ->
+        DnsQuestion.write_qname buffer quad_a.domain;
+        write_u16 buffer (QueryType.AAAA |> QueryType.num_of_t);
+        write_u16 buffer 1;
+        write_u32 buffer quad_a.ttl;
+        write_u16 buffer 16;
+        Ipaddr.V6.to_octets quad_a.addr |> int_of_string |> write_u16 buffer
+      | UNKOWN u -> Format.printf "Skipping record %s" u.domain
     in
     buffer.pos - start_pos
   ;;

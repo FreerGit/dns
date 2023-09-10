@@ -8,20 +8,19 @@ let run_dgram2 addr ~net sw ~buffer =
   let listening_socket = Eio.Net.datagram_socket ~sw net server_addr in
   Fiber.fork ~sw (fun () ->
     (* let e = Eio.Net.datagram_socket ~sw net e1 in *)
-    traceln "Sending data to %a" Eio.Net.Sockaddr.pp addr;
-    Eio.Net.send listening_socket ~dst:addr [ buffer ];
-    print_endline "done");
+    (* traceln "Sending data to %a" Eio.Net.Sockaddr.pp addr; *)
+    Eio.Net.send listening_socket ~dst:addr [ buffer ]);
   Fiber.fork_promise ~sw (fun () ->
     let buf = Cstruct.create 500 in
-    traceln "Waiting to receive data on %a" Eio.Net.Sockaddr.pp server_addr;
+    (* traceln "Waiting to receive data on %a" Eio.Net.Sockaddr.pp server_addr; *)
     let _, recv = Eio.Net.recv listening_socket buf in
-    traceln "Received message %s" (Cstruct.to_hex_string (Cstruct.sub buf 0 recv));
+    (* traceln "Received message %s" (Cstruct.to_hex_string (Cstruct.sub buf 0 recv)); *)
     Cstruct.sub buf 0 recv)
 ;;
 
 let () =
   let open Dns.Protocol in
-  let qname = "google.com" in
+  let qname = "www.yahoo.com" in
   let qtype = QueryType.A in
   let header = DnsHeader.make () in
   let header = { header with id = 6666 } in

@@ -36,6 +36,13 @@ module PacketBuffer = struct
     else Cstruct.sub t.buf pos len
   ;;
 
+  let set t ~pos ~u8 = Cstruct.set_uint8 t.buf pos u8
+
+  let set_u16 t ~pos ~u16 =
+    set t ~pos ~u8:(u16 lsr 8);
+    set t ~pos:(pos + 1) ~u8:(u16 land 0xFF)
+  ;;
+
   let read_u16 t =
     let a = read t lsl 8 in
     let b = read t in
