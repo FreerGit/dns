@@ -55,7 +55,6 @@ module PacketBuffer = struct
     if t.pos >= 512
     then raise_s [%message "Error: End of buffer" ~loc:[%here]]
     else Cstruct.set_uint8 t.buf t.pos u8;
-    (* Cstruct.to_string t.buf |> print_endline; *)
     t.pos <- t.pos + 1
   ;;
 

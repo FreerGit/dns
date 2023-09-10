@@ -135,8 +135,7 @@ module DnsHeader = struct
     PacketBuffer.write_u16 buffer t.questions;
     PacketBuffer.write_u16 buffer t.answers;
     PacketBuffer.write_u16 buffer t.authoritative_entries;
-    PacketBuffer.write_u16 buffer t.resource_entries;
-    Cstruct.hexdump buffer.buf
+    PacketBuffer.write_u16 buffer t.resource_entries
   ;;
 end
 
@@ -211,8 +210,8 @@ module DnsQuestion = struct
       if len > 0x3f
       then raise_s [%message "Error: Single label exceeds 63 chars length" ~loc:[%here]]
       else PacketBuffer.write p_buffer len;
-      String.iter label ~f:(fun b -> PacketBuffer.write p_buffer (Char.to_int b));
-      PacketBuffer.write p_buffer 0)
+      String.iter label ~f:(fun b -> PacketBuffer.write p_buffer (Char.to_int b)));
+    PacketBuffer.write p_buffer 0
   ;;
 
   let read buffer =
