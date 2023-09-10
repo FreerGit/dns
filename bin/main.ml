@@ -6,15 +6,10 @@ let run_dgram2 addr ~net sw ~buffer =
   let socket = Eio.Net.Ipaddr.V4.any in
   let server_addr = `Udp (socket, 8080) in
   let listening_socket = Eio.Net.datagram_socket ~sw net server_addr in
-  Fiber.fork ~sw (fun () ->
-    (* let e = Eio.Net.datagram_socket ~sw net e1 in *)
-    (* traceln "Sending data to %a" Eio.Net.Sockaddr.pp addr; *)
-    Eio.Net.send listening_socket ~dst:addr [ buffer ]);
+  Fiber.fork ~sw (fun () -> Eio.Net.send listening_socket ~dst:addr [ buffer ]);
   Fiber.fork_promise ~sw (fun () ->
     let buf = Cstruct.create 500 in
-    (* traceln "Waiting to receive data on %a" Eio.Net.Sockaddr.pp server_addr; *)
     let _, recv = Eio.Net.recv listening_socket buf in
-    (* traceln "Received message %s" (Cstruct.to_hex_string (Cstruct.sub buf 0 recv)); *)
     Cstruct.sub buf 0 recv)
 ;;
 

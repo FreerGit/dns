@@ -281,7 +281,6 @@ module DnsRecord = struct
     let domain = DnsQuestion.read_qname buffer in
     let qtype_num = PacketBuffer.read_u16 buffer in
     let qtype = QueryType.t_of_num qtype_num in
-    (* Ignore QCLASS for now *)
     let _ = PacketBuffer.read_u16 buffer in
     let ttl = PacketBuffer.read_u32 buffer in
     let data_len = PacketBuffer.read_u16 buffer in
@@ -408,7 +407,6 @@ module DnsPacket = struct
     let answers = ref [] in
     let authorities = ref [] in
     let resources = ref [] in
-    (* TODO: iterate based on number off questions in header *)
     for _ = 1 to header.questions do
       let question = DnsQuestion.read buffer in
       questions := List.cons question !questions
