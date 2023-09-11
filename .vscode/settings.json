@@ -1,6 +1,7 @@
 {
   "ocaml.sandbox": {
-    "kind": "global"
+    "kind": "opam",
+    "switch": "5.0.0+options"
   },
   "nixEnvSelector.suggestion": false,
   "nixEnvSelector.nixFile": "${workspaceRoot}/shell.nix"
