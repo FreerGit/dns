@@ -34,15 +34,15 @@ end
 
 module DnsHeader = struct
   [%%cstruct
-  type t =
-    { id : uint16_t
-    ; flags : uint16_t
-    ; questions : uint16_t
-    ; answers : uint16_t
-    ; authoritative_entries : uint16_t
-    ; resource_entries : uint16_t
-    }
-  [@@big_endian]]
+    type t =
+      { id : uint16_t
+      ; flags : uint16_t
+      ; questions : uint16_t
+      ; answers : uint16_t
+      ; authoritative_entries : uint16_t
+      ; resource_entries : uint16_t
+      }
+    [@@big_endian]]
 
   type t =
     { id : int
@@ -336,7 +336,7 @@ module DnsRecord = struct
         DnsQuestion.write_qname buffer a.domain;
         write_u16 buffer (QueryType.num_of_t QueryType.A);
         write_u16 buffer 1;
-        write_u16 buffer a.ttl;
+        write_u32 buffer a.ttl;
         write_u16 buffer 4;
         let octets = Ipaddr.V4.to_octets a.addr in
         write buffer (String.get octets 0 |> Char.to_int);
@@ -389,11 +389,11 @@ end
 
 module DnsPacket = struct
   type t =
-    { header : DnsHeader.t
-    ; questions : DnsQuestion.t list
-    ; answers : DnsRecord.t list
-    ; authorities : DnsRecord.t list
-    ; resources : DnsRecord.t list
+    { mutable header : DnsHeader.t
+    ; mutable questions : DnsQuestion.t list
+    ; mutable answers : DnsRecord.t list
+    ; mutable authorities : DnsRecord.t list
+    ; mutable resources : DnsRecord.t list
     }
   [@@deriving show { with_path = false }]
 
@@ -403,35 +403,33 @@ module DnsPacket = struct
 
   let read buffer =
     let header = DnsHeader.read buffer in
-    let questions = ref [] in
-    let answers = ref [] in
-    let authorities = ref [] in
-    let resources = ref [] in
+    let packet =
+      { header; questions = []; answers = []; authorities = []; resources = [] }
+    in
     for _ = 1 to header.questions do
       let question = DnsQuestion.read buffer in
-      questions := List.cons question !questions
+      packet.questions <- List.cons question packet.questions
     done;
     for _ = 1 to header.answers do
       let answer = DnsRecord.read buffer in
-      answers := List.cons answer !answers
+      packet.answers <- List.cons answer packet.answers
     done;
     for _ = 1 to header.authoritative_entries do
       let authority = DnsRecord.read buffer in
-      authorities := List.cons authority !authorities
+      packet.authorities <- List.cons authority packet.authorities
     done;
     for _ = 1 to header.resource_entries do
       let resource = DnsRecord.read buffer in
-      resources := List.cons resource !resources
+      packet.resources <- List.cons resource packet.resources
     done;
-    { header
-    ; questions = !questions
-    ; answers = !answers
-    ; authorities = !authorities
-    ; resources = !resources
-    }
+    packet
   ;;
 
   let write buffer t =
+    t.header <- { t.header with questions = List.length t.questions };
+    t.header <- { t.header with answers = List.length t.answers };
+    t.header <- { t.header with authoritative_entries = List.length t.authorities };
+    t.header <- { t.header with resource_entries = List.length t.resources };
     DnsHeader.write buffer t.header;
     List.iter t.questions ~f:(DnsQuestion.write buffer);
     List.iter t.answers ~f:(fun req -> DnsRecord.write buffer req |> ignore);

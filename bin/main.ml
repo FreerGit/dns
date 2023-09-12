@@ -47,13 +47,12 @@ let handle_query ~sw ~net udp_socket =
   let listening_socket = Eio.Net.datagram_socket ~sw net udp_socket in
   let src, _ = Eio.Net.recv listening_socket req_buffer.buf in
   let request = DnsPacket.read req_buffer in
-  let header = DnsHeader.make () in
-  print_endline @@ string_of_int request.header.id;
-  let header = { header with id = request.header.id } in
-  let header = { header with recursion_desired = true } in
-  let header = { header with recursion_available = true } in
-  let header = { header with query_response = true } in
-  let packet = DnsPacket.make header in
+  let h = DnsHeader.make () in
+  let h = { h with id = request.header.id } in
+  let h = { h with recursion_desired = true } in
+  let h = { h with recursion_available = true } in
+  let h = { h with query_response = true } in
+  let packet = DnsPacket.make h in
   let question = List.hd request.questions in
   let packet =
     match question with
@@ -64,22 +63,14 @@ let handle_query ~sw ~net udp_socket =
          print_s [%message "" (sprintf "%s" e) ~loc:[%here]];
          { packet with header = { packet.header with rescode = ResultCode.SERVFAIL } }
        | Ok res ->
-         let packet = { packet with questions = List.cons q packet.questions } in
-         let packet =
-           { packet with header = { packet.header with rescode = res.header.rescode } }
-         in
-         let packet =
-           List.fold packet.answers ~init:packet ~f:(fun _ record ->
-             { packet with answers = List.cons record packet.answers })
-         in
-         let packet =
-           List.fold packet.authorities ~init:packet ~f:(fun _ record ->
-             { packet with authorities = List.cons record packet.authorities })
-         in
-         let packet =
-           List.fold packet.resources ~init:packet ~f:(fun _ record ->
-             { packet with resources = List.cons record packet.resources })
-         in
+         packet.questions <- List.cons q packet.questions;
+         packet.header <- { packet.header with rescode = res.header.rescode };
+         List.iter res.answers ~f:(fun record ->
+           packet.answers <- List.cons record packet.answers);
+         List.iter res.authorities ~f:(fun record ->
+           packet.authorities <- List.cons record packet.authorities);
+         List.iter res.resources ~f:(fun record ->
+           packet.resources <- List.cons record packet.resources);
          packet)
   in
   let res_buffer = PacketBuffer.create "" in
@@ -89,13 +80,7 @@ let handle_query ~sw ~net udp_socket =
   Eio.Net.send listening_socket ~dst:src [ data ]
 ;;
 
-(* let packet = DnsPacket.make header in *)
-
-(* () *)
-
 let () =
-  (* let qname = "www.yahoo.com" in *)
-  (* let qtype = QueryType.A in *)
   let socket = `Udp (broadcast_of_string "0.0.0.0", 2053) in
   Eio_main.run
   @@ fun env ->
@@ -104,5 +89,5 @@ let () =
     Eio.Switch.run (fun sw -> handle_query ~net ~sw socket);
     loop ()
   in
-  loop () (* loop (); *)
+  loop ()
 ;;

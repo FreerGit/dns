@@ -9,7 +9,7 @@ in
 pkgs.mkShell {
   # build tools
   
-  nativeBuildInputs = with pkgs; [ curl dune-release ocamlformat inotify-tools ];
+  nativeBuildInputs = with pkgs; [ dune-release ocamlformat inotify-tools ];
   # dependencies
   buildInputs = 
     with ocamlPackages;
@@ -20,7 +20,6 @@ pkgs.mkShell {
 
       findlib
       merlin
-      utop
       core
 
       eio
