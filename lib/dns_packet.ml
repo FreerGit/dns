@@ -1,6 +1,5 @@
 open Core
 
-module DnsPacket = struct
   type t =
     { mutable header : Dns_header.t
     ; mutable questions : Dns_question.t list
@@ -50,4 +49,3 @@ module DnsPacket = struct
     List.iter t.resources ~f:(fun req -> Dns_record.write buffer req |> ignore);
     ()
   ;;
-end

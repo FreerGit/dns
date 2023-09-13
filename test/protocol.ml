@@ -26,8 +26,8 @@ let%expect_test "DNS Packet" =
   let path = Eio.Stdenv.cwd env / "packets/response_packet.txt" in
   Eio.Path.load path
   |> Dns.Packet_buffer.create
-  |> Dns.Protocol.DnsPacket.read
-  |> Dns.Protocol.DnsPacket.show
+  |> Dns.Dns_packet.read
+  |> Dns.Dns_packet.show
   |> print_endline;
   [%expect
     {|

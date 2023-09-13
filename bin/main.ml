@@ -23,10 +23,10 @@ let lookup qname qtype =
   let header = { header with id = 6666 } in
   let header = { header with questions = 1 } in
   let header = { header with recursion_desired = true } in
-  let packet = Dns.Protocol.DnsPacket.make header in
+  let packet = Dns.Dns_packet.make header in
   let packet = { packet with questions = [ { name = qname; qtype } ] } in
   let req_buffer = Packet_buffer.create "" in
-  Dns.Protocol.DnsPacket.write req_buffer packet;
+  Dns.Dns_packet.write req_buffer packet;
   let resp =
     Eio_main.run
     @@ fun env ->
@@ -38,7 +38,7 @@ let lookup qname qtype =
   match data with
   | Error e -> Error (Core.Exn.to_string e)
   | Ok c ->
-    let res_packet = Protocol.DnsPacket.read (Packet_buffer.create @@ Cstruct.to_string c) in
+    let res_packet = Dns_packet.read (Packet_buffer.create @@ Cstruct.to_string c) in
     Ok res_packet
 ;;
 
@@ -46,13 +46,13 @@ let handle_query ~sw ~net udp_socket =
   let req_buffer = Packet_buffer.create "" in
   let listening_socket = Eio.Net.datagram_socket ~sw net udp_socket in
   let src, _ = Eio.Net.recv listening_socket req_buffer.buf in
-  let request = Protocol.DnsPacket.read req_buffer in
+  let request = Dns_packet.read req_buffer in
   let h = Dns_header.make () in
   let h = { h with id = request.header.id } in
   let h = { h with recursion_desired = true } in
   let h = { h with recursion_available = true } in
   let h = { h with query_response = true } in
-  let packet = Protocol.DnsPacket.make h in
+  let packet = Dns_packet.make h in
   let question = List.hd request.questions in
   let packet =
     match question with
@@ -74,7 +74,7 @@ let handle_query ~sw ~net udp_socket =
          packet)
   in
   let res_buffer = Packet_buffer.create "" in
-  Protocol.DnsPacket.write res_buffer packet;
+  Dns_packet.write res_buffer packet;
   let len = res_buffer.pos in
   let data = Packet_buffer.get_range res_buffer ~pos:0 ~len in
   Eio.Net.send listening_socket ~dst:src [ data ]
