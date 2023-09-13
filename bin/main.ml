@@ -2,7 +2,6 @@ open Core
 open Eio
 open Dns
 
-
 let run_dgram2 addr ~net sw ~buffer =
   let socket = Eio.Net.Ipaddr.V4.any in
   let server_addr = `Udp (socket, 8080) in
@@ -56,7 +55,8 @@ let handle_query ~sw ~net udp_socket =
   let question = List.hd request.questions in
   let packet =
     match question with
-    | None -> { packet with header = { packet.header with rescode = Result_code.FORMERR } }
+    | None ->
+      { packet with header = { packet.header with rescode = Result_code.FORMERR } }
     | Some q ->
       (match lookup q.name q.qtype with
        | Error e ->
