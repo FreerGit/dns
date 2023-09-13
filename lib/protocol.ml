@@ -139,41 +139,10 @@ module DnsHeader = struct
   ;;
 end
 
-module QueryType = struct
-  type t =
-    | UNKOWN of int
-    | A
-    | NS
-    | CNAME
-    | MX
-    | AAAA
-  [@@deriving show { with_path = false }]
-
-  let num_of_t t =
-    match t with
-    | UNKOWN x -> x
-    | A -> 1
-    | NS -> 2
-    | CNAME -> 5
-    | MX -> 15
-    | AAAA -> 28
-  ;;
-
-  let t_of_num num =
-    match num with
-    | 1 -> A
-    | 2 -> NS
-    | 5 -> CNAME
-    | 15 -> MX
-    | 28 -> AAAA
-    | _ -> UNKOWN num
-  ;;
-end
-
 module DnsQuestion = struct
   type t =
     { name : string
-    ; qtype : QueryType.t
+    ; qtype : Query_type.t
     }
   [@@deriving show { with_path = false }]
 
@@ -228,14 +197,14 @@ module DnsQuestion = struct
 
   let read buffer =
     let name = read_qname buffer in
-    let qtype = PacketBuffer.read_u16 buffer |> QueryType.t_of_num in
+    let qtype = PacketBuffer.read_u16 buffer |> Query_type.t_of_num in
     let _ = PacketBuffer.read_u16 buffer in
     { name; qtype }
   ;;
 
   let write buffer t =
     write_qname buffer t.name;
-    let typenum = QueryType.num_of_t t.qtype in
+    let typenum = Query_type.num_of_t t.qtype in
     PacketBuffer.write_u16 buffer typenum;
     PacketBuffer.write_u16 buffer 1
   ;;
@@ -280,7 +249,7 @@ module DnsRecord = struct
   let read buffer =
     let domain = DnsQuestion.read_qname buffer in
     let qtype_num = PacketBuffer.read_u16 buffer in
-    let qtype = QueryType.t_of_num qtype_num in
+    let qtype = Query_type.t_of_num qtype_num in
     let _ = PacketBuffer.read_u16 buffer in
     let ttl = PacketBuffer.read_u32 buffer in
     let data_len = PacketBuffer.read_u16 buffer in
@@ -334,7 +303,7 @@ module DnsRecord = struct
       match t with
       | A a ->
         DnsQuestion.write_qname buffer a.domain;
-        write_u16 buffer (QueryType.num_of_t QueryType.A);
+        write_u16 buffer (Query_type.num_of_t Query_type.A);
         write_u16 buffer 1;
         write_u32 buffer a.ttl;
         write_u16 buffer 4;
@@ -345,7 +314,7 @@ module DnsRecord = struct
         write buffer (String.get octets 3 |> Char.to_int)
       | NS ns ->
         DnsQuestion.write_qname buffer ns.domain;
-        write_u16 buffer (QueryType.NS |> QueryType.num_of_t);
+        write_u16 buffer (Query_type.NS |> Query_type.num_of_t);
         write_u16 buffer 1;
         write_u16 buffer ns.ttl;
         let pos = buffer.pos in
@@ -355,7 +324,7 @@ module DnsRecord = struct
         set_u16 buffer ~pos ~u16:size
       | CNAME cn ->
         DnsQuestion.write_qname buffer cn.domain;
-        write_u16 buffer (QueryType.NS |> QueryType.num_of_t);
+        write_u16 buffer (Query_type.NS |> Query_type.num_of_t);
         write_u16 buffer 1;
         write_u16 buffer cn.ttl;
         let pos = buffer.pos in
@@ -365,7 +334,7 @@ module DnsRecord = struct
         set_u16 buffer ~pos ~u16:size
       | MX mx ->
         DnsQuestion.write_qname buffer mx.domain;
-        write_u16 buffer (QueryType.NS |> QueryType.num_of_t);
+        write_u16 buffer (Query_type.NS |> Query_type.num_of_t);
         write_u16 buffer 1;
         write_u16 buffer mx.ttl;
         let pos = buffer.pos in
@@ -376,7 +345,7 @@ module DnsRecord = struct
         set_u16 buffer ~pos ~u16:size
       | AAAA quad_a ->
         DnsQuestion.write_qname buffer quad_a.domain;
-        write_u16 buffer (QueryType.AAAA |> QueryType.num_of_t);
+        write_u16 buffer (Query_type.AAAA |> Query_type.num_of_t);
         write_u16 buffer 1;
         write_u32 buffer quad_a.ttl;
         write_u16 buffer 16;

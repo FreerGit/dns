@@ -3,6 +3,4 @@
  (name main)
  (libraries dns dns_test)
  (preprocess
-
-  (pps ppx_jane ppx_expect ppx_cstruct ppx_deriving.show))
- )
+  (pps ppx_jane ppx_expect ppx_cstruct ppx_deriving.show)))
