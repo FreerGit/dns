@@ -1,5 +1,4 @@
 open Core
-open Dns.Packet_buffer
 
 let%expect_test "DNS Header" =
   let ( / ) = Eio.Path.( / ) in
@@ -7,9 +6,9 @@ let%expect_test "DNS Header" =
   @@ fun env ->
   let path = Eio.Stdenv.cwd env / "packets/response_packet.txt" in
   Eio.Path.load path
-  |> PacketBuffer.create
-  |> Dns.Protocol.DnsHeader.read
-  |> Dns.Protocol.DnsHeader.show
+  |> Dns.Packet_buffer.create
+  |> Dns.Dns_header.read
+  |> Dns.Dns_header.show
   |> print_endline;
   [%expect
     {|
@@ -26,7 +25,7 @@ let%expect_test "DNS Packet" =
   @@ fun env ->
   let path = Eio.Stdenv.cwd env / "packets/response_packet.txt" in
   Eio.Path.load path
-  |> PacketBuffer.create
+  |> Dns.Packet_buffer.create
   |> Dns.Protocol.DnsPacket.read
   |> Dns.Protocol.DnsPacket.show
   |> print_endline;

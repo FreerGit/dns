@@ -1,6 +1,5 @@
 open Core
 
-module PacketBuffer = struct
   type t =
     { mutable buf : Cstruct.t
     ; mutable pos : int
@@ -76,4 +75,3 @@ module PacketBuffer = struct
     write t ((u32 lsr 8) land 0xFF);
     write t ((u32 lsr 0) land 0xFF)
   ;;
-end

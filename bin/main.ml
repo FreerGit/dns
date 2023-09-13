@@ -1,7 +1,7 @@
 open Core
 open Eio
-open Dns.Packet_buffer
-open Dns.Protocol
+open Dns
+
 
 let run_dgram2 addr ~net sw ~buffer =
   let socket = Eio.Net.Ipaddr.V4.any in
@@ -19,14 +19,14 @@ let broadcast_of_string ip =
 ;;
 
 let lookup qname qtype =
-  let header = DnsHeader.make () in
+  let header = Dns_header.make () in
   let header = { header with id = 6666 } in
   let header = { header with questions = 1 } in
   let header = { header with recursion_desired = true } in
-  let packet = DnsPacket.make header in
+  let packet = Dns.Protocol.DnsPacket.make header in
   let packet = { packet with questions = [ { name = qname; qtype } ] } in
-  let req_buffer = PacketBuffer.create "" in
-  DnsPacket.write req_buffer packet;
+  let req_buffer = Packet_buffer.create "" in
+  Dns.Protocol.DnsPacket.write req_buffer packet;
   let resp =
     Eio_main.run
     @@ fun env ->
@@ -38,30 +38,30 @@ let lookup qname qtype =
   match data with
   | Error e -> Error (Core.Exn.to_string e)
   | Ok c ->
-    let res_packet = DnsPacket.read (PacketBuffer.create @@ Cstruct.to_string c) in
+    let res_packet = Protocol.DnsPacket.read (Packet_buffer.create @@ Cstruct.to_string c) in
     Ok res_packet
 ;;
 
 let handle_query ~sw ~net udp_socket =
-  let req_buffer = PacketBuffer.create "" in
+  let req_buffer = Packet_buffer.create "" in
   let listening_socket = Eio.Net.datagram_socket ~sw net udp_socket in
   let src, _ = Eio.Net.recv listening_socket req_buffer.buf in
-  let request = DnsPacket.read req_buffer in
-  let h = DnsHeader.make () in
+  let request = Protocol.DnsPacket.read req_buffer in
+  let h = Dns_header.make () in
   let h = { h with id = request.header.id } in
   let h = { h with recursion_desired = true } in
   let h = { h with recursion_available = true } in
   let h = { h with query_response = true } in
-  let packet = DnsPacket.make h in
+  let packet = Protocol.DnsPacket.make h in
   let question = List.hd request.questions in
   let packet =
     match question with
-    | None -> { packet with header = { packet.header with rescode = ResultCode.FORMERR } }
+    | None -> { packet with header = { packet.header with rescode = Result_code.FORMERR } }
     | Some q ->
       (match lookup q.name q.qtype with
        | Error e ->
          print_s [%message "" (sprintf "%s" e) ~loc:[%here]];
-         { packet with header = { packet.header with rescode = ResultCode.SERVFAIL } }
+         { packet with header = { packet.header with rescode = Result_code.SERVFAIL } }
        | Ok res ->
          packet.questions <- List.cons q packet.questions;
          packet.header <- { packet.header with rescode = res.header.rescode };
@@ -73,10 +73,10 @@ let handle_query ~sw ~net udp_socket =
            packet.resources <- List.cons record packet.resources);
          packet)
   in
-  let res_buffer = PacketBuffer.create "" in
-  DnsPacket.write res_buffer packet;
+  let res_buffer = Packet_buffer.create "" in
+  Protocol.DnsPacket.write res_buffer packet;
   let len = res_buffer.pos in
-  let data = PacketBuffer.get_range res_buffer ~pos:0 ~len in
+  let data = Packet_buffer.get_range res_buffer ~pos:0 ~len in
   Eio.Net.send listening_socket ~dst:src [ data ]
 ;;
 
