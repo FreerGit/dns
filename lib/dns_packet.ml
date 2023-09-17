@@ -37,7 +37,7 @@ let read buffer =
   packet
 ;;
 
-let write buffer t =
+let write t buffer =
   t.header <- { t.header with questions = List.length t.questions };
   t.header <- { t.header with answers = List.length t.answers };
   t.header <- { t.header with authoritative_entries = List.length t.authorities };
@@ -48,4 +48,41 @@ let write buffer t =
   List.iter t.authorities ~f:(fun req -> Dns_record.write buffer req |> ignore);
   List.iter t.resources ~f:(fun req -> Dns_record.write buffer req |> ignore);
   ()
+;;
+
+let get_random_a t =
+  Iter.filter_map
+    (fun record ->
+      match record with
+      | Dns_record.A { addr; _ } -> Some addr
+      | _ -> None)
+    (Iter.of_list t.answers)
+  |> Iter.head
+;;
+
+let get_ns t qname =
+  Iter.filter_map
+    (fun record ->
+      match record with
+      | Dns_record.NS { domain; host; _ } -> Some (domain, host)
+      | _ -> None)
+    (Iter.of_list t.authorities)
+  |> Iter.filter (fun (domain, _) -> String.is_suffix qname ~suffix:domain)
+;;
+
+let get_resolved_ns t qname =
+  get_ns t qname
+  |> Iter.flat_map (fun (_, host) ->
+    Iter.filter_map
+      (fun record ->
+        match record with
+        | Dns_record.A { domain; addr; _ } ->
+          if phys_equal domain host then Some addr else None
+        | _ -> None)
+      (Iter.of_list t.resources))
+  |> Iter.head
+;;
+
+let get_unresolved_ns t qname =
+  get_ns t qname |> Iter.map (fun (_, host) -> host) |> Iter.head
 ;;

@@ -1,5 +1,5 @@
 (library
  (name dns)
- (libraries core cstruct eio ipaddr)
+ (libraries core cstruct eio ipaddr iter)
  (preprocess
   (pps ppx_jane ppx_expect ppx_cstruct ppx_deriving.show)))
