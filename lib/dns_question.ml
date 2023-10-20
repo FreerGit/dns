@@ -19,7 +19,7 @@ let read_qname (p_buffer : Packet_buffer.t) =
     | false ->
       let len = Packet_buffer.get p_buffer !local_pos in
       (* If len has the two most sign. bits set then we need to jump *)
-      (match phys_equal (len land 0xC0) 0xC0 with
+      (match Int.equal (len land 0xC0) 0xC0 with
        | true ->
          if not !jumped then Packet_buffer.seek p_buffer (!local_pos + 2);
          let next_byte = Packet_buffer.get p_buffer (!local_pos + 1) in
@@ -30,7 +30,7 @@ let read_qname (p_buffer : Packet_buffer.t) =
          loop ()
        | false ->
          local_pos := !local_pos + 1;
-         if not @@ phys_equal len 0
+         if not @@ Int.equal len 0
          then (
            domain_name := !domain_name ^ !delim;
            let str_buffer = Packet_buffer.get_range p_buffer ~pos:!local_pos ~len in

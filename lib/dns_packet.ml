@@ -76,8 +76,7 @@ let get_resolved_ns t qname =
     Iter.filter_map
       (fun record ->
         match record with
-        | Dns_record.A { domain; addr; _ } ->
-          if phys_equal domain host then Some addr else None
+        | Dns_record.A { domain; addr; _ } when String.( = ) domain host -> Some addr
         | _ -> None)
       (Iter.of_list t.resources))
   |> Iter.head
