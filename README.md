@@ -24,4 +24,10 @@ A good and detailed overview is [rfc standard](https://www.ietf.org/rfc/rfc1035.
 
 ## How to use the server
 
-TODO
+Once server is built and running, simply open a new terminal and run:
+
+```console
+dig @127.0.0.1 -p 2053 www.google.com
+```
+
+![Terminal output](resources/output.png)
