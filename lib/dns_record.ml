@@ -138,7 +138,9 @@ let write (buffer : Packet_buffer.t) t =
       write_u16 buffer 1;
       write_u32 buffer quad_a.ttl;
       write_u16 buffer 16;
-      Ipaddr.V6.to_octets quad_a.addr |> int_of_string |> write_u16 buffer
+      let a, b, c, d, e, f, g, h = Ipaddr.V6.to_int16 quad_a.addr in
+      let octets = [ a; b; c; d; e; f; g; h ] in
+      List.iter octets ~f:(fun octet -> write_u16 buffer octet)
     | UNKOWN u -> Format.printf "Skipping record %s" u.domain
   in
   buffer.pos - start_pos
