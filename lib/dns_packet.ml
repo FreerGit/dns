@@ -15,6 +15,7 @@ let make header =
 
 let read buffer =
   let header = Dns_header.read buffer in
+  Dns_header.show header |> Eio.traceln "Read packet from query:\n %s \n %!";
   let packet =
     { header; questions = []; answers = []; authorities = []; resources = [] }
   in
@@ -47,6 +48,7 @@ let write t buffer =
   List.iter t.answers ~f:(fun req -> Dns_record.write buffer req |> ignore);
   List.iter t.authorities ~f:(fun req -> Dns_record.write buffer req |> ignore);
   List.iter t.resources ~f:(fun req -> Dns_record.write buffer req |> ignore);
+  show t |> Eio.traceln "after write: \n %s \n";
   ()
 ;;
 
