@@ -1,6 +1,6 @@
 (executable
  (public_name dns)
  (name main)
- (libraries dns dns_test async async_udp core_unix core_unix.command_unix)
+ (libraries dns dns_test)
  (preprocess
   (pps ppx_jane ppx_let ppx_expect ppx_cstruct ppx_deriving.show)))

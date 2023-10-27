@@ -22,8 +22,6 @@ pkgs.mkShell {
       merlin
       core
 
-      async
-      async_udp
       eio
       eio_main
       cstruct
