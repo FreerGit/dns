@@ -22,12 +22,27 @@ If you would rather use dune directly instead of nix then you need to install th
 
 A good and detailed overview is [rfc standard](https://www.ietf.org/rfc/rfc1035.txt). The standard can be hard to follow at times but the actual packet layout is well explained.
 
+The resolver itself can handle the following query types:
+```ocaml
+type t =
+  | UNKOWN of int
+  | A
+  | NS
+  | CNAME
+  | MX
+  | AAAA
+[@@deriving show { with_path = false }]
+```
+So IPv4 and IPv6 is supported.
+
 ## How to use the server
 
 Once server is built and running, simply open a new terminal and run:
 
 ```console
-dig @127.0.0.1 -p 2053 www.google.com
+dig @127.0.0.1 -p 2053 google.com
 ```
+
+Of course, you can query for any website you'd like, google.com is just an example.
 
 ![Terminal output](resources/output.png)
